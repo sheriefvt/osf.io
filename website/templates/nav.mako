@@ -26,6 +26,7 @@
                 <li><a href="${domain}">OSF<b>HOME</b></a></li>
                 <li><a href="${domain}preprints/">OSF<b>PREPRINTS</b></a></li>
                 <li><a href="${domain}registries/">OSF<b>REGISTRIES</b></a></li>
+                <li><a href="${domain}reviews/">OSF<b>REVIEWS</b></a></li>
                 <li><a href="${domain}meetings/">OSF<b>MEETINGS</b></a></li>
             </ul>
         </div>
