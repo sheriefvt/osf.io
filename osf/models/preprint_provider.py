@@ -10,10 +10,12 @@ from osf.models.subject import Subject
 from osf.utils.datetime_aware_jsonfield import DateTimeAwareJSONField
 from osf.utils.fields import EncryptedTextField
 
+from reviews.models.mixins import ReviewProviderMixin
+
 from website.util import api_v2_url
 
 
-class PreprintProvider(ObjectIDMixin, BaseModel):
+class PreprintProvider(ObjectIDMixin, ReviewProviderMixin, BaseModel):
     name = models.CharField(null=False, max_length=128)  # max length on prod: 22
     description = models.TextField(default='', blank=True)
     domain = models.URLField(blank=True, default='', max_length=200)
