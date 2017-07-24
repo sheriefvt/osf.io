@@ -424,7 +424,7 @@ def make_url_map(app):
         Rule(
             '/reviews/',
             'get',
-            reviews_views.reviews_landing_page(),
+            reviews_views.reviews_landing_page,
             OsfWebRenderer('public/pages/reviews_landing.mako', trust=False),
         ),
 
