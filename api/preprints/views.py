@@ -2,12 +2,15 @@ import re
 
 from django.db.models import Q
 
+from guardian.shortcuts import get_objects_for_user
+
 from rest_framework import generics
 from rest_framework.exceptions import NotFound, PermissionDenied, NotAuthenticated
 from rest_framework import permissions as drf_permissions
 
 from framework.auth.oauth_scopes import CoreScopes
-from osf.models import PreprintService
+from osf.models import PreprintProvider, PreprintService, Identifier
+from reviews.workflow import public_reviewable_query
 
 from api.base.exceptions import Conflict
 from api.base.views import JSONAPIBaseView, WaterButlerMixin
@@ -159,6 +162,7 @@ class PreprintList(JSONAPIBaseView, generics.ListCreateAPIView, PreprintFilterMi
     serializer_class = PreprintSerializer
 
     ordering = ('-date_created')
+    ordering_fields = ('date_created', 'date_last_transitioned')
     view_category = 'preprints'
     view_name = 'preprint-list'
 
@@ -173,13 +177,7 @@ class PreprintList(JSONAPIBaseView, generics.ListCreateAPIView, PreprintFilterMi
         auth_user = getattr(auth, 'user', None)
 
         # Permissions on the list objects are handled by the query
-        default_qs = PreprintService.objects.filter(node__is_deleted=False, node__isnull=False)
-        no_user_query = Q(is_published=True, node__is_public=True)
-        if auth_user:
-            contrib_user_query = Q(is_published=True, node__contributor__user_id=auth_user.id, node__contributor__read=True)
-            admin_user_query = Q(node__contributor__user_id=auth_user.id, node__contributor__admin=True)
-            return default_qs.filter(no_user_query | contrib_user_query | admin_user_query)
-        return default_qs.filter(no_user_query)
+        return self.preprints_queryset(PreprintService.objects.all(), auth_user)
 
     # overrides ListAPIView
     def get_queryset(self):
