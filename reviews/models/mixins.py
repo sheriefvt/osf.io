@@ -225,8 +225,8 @@ class ReviewsMachine(Machine):
 
     def get_info(self):
         return dict(
-            is_rejected = self.review_log.to_state == workflow.States.REJECTED.value,
-            notify_comment = not (self.reviewable.provider.reviews_comments_private and not self.review_log.comment),
+            is_rejected = self.action.to_state == workflow.States.REJECTED.value,
+            notify_comment = not (self.reviewable.provider.reviews_comments_private and not self.action.comment),
             is_pre_moderation = self.reviewable.provider.reviews_workflow == workflow.Workflows.PRE_MODERATION.value
         )
 
@@ -246,7 +246,7 @@ class ReviewsMachine(Machine):
     def reviews_notification(self, context):
         timestamp = timezone.now()
         event_type = utils.find_subscription_type('global_reviews')
-        template = context.get('template') + '.txt.mako'
+        template = ''.join(context.get('template')) + '.txt.mako'
         for user_id in context.get('email_recipients'):
             user = OSFUser.load(user_id)
             subscriptions = get_user_subscriptions(user, event_type)
