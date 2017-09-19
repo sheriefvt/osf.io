@@ -972,7 +972,16 @@ class TestNotificationUtils(OsfTestCase):
                 },
                 'kind': 'event',
                 'children': []
-            },
+            }, {
+                'event': {
+                    'title': 'global_reviews',
+                    'description': constants.USER_SUBSCRIPTIONS_AVAILABLE['global_reviews'],
+                    'notificationType': 'email_transactional',
+                    'parent_notification_type': None
+                },
+                'kind': 'event',
+                'children': []
+            }
         ]
         assert_items_equal(data, expected)
 
