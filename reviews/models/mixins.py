@@ -5,7 +5,6 @@ from include import IncludeQuerySet
 from blinker import signal
 from transitions import Machine
 
-from django.utils import timezone
 from django.db import models
 from django.db import transaction
 from django.utils import timezone
@@ -21,7 +20,7 @@ from osf.models import OSFUser
 
 
 from website import mails
-from website.notifications.emails import get_user_subscriptions, get_node_lineage, localize_timestamp
+from website.notifications.emails import get_user_subscriptions, get_node_lineage
 from website.notifications import utils
 
 reviews_email = signal('reviews_email')
@@ -198,7 +197,7 @@ class ReviewsMachine(Machine):
     def notify_submit(self, ev):
         context = self.get_context()
         context['referrer'] = ev.kwargs.get('user')
-        context['template'] ='reviews_submission_confirmation'
+        context['template'] = 'reviews_submission_confirmation'
         context['is_pre_moderation'] = self.get_info().get('is_pre_moderation')
         reviews_email.send(context=context)
 
@@ -225,9 +224,9 @@ class ReviewsMachine(Machine):
 
     def get_info(self):
         return dict(
-            is_rejected = self.action.to_state == workflow.States.REJECTED.value,
-            notify_comment = not (self.reviewable.provider.reviews_comments_private and not self.action.comment),
-            is_pre_moderation = self.reviewable.provider.reviews_workflow == workflow.Workflows.PRE_MODERATION.value
+            is_rejected=self.action.to_state == workflow.States.REJECTED.value,
+            notify_comment=not (self.reviewable.provider.reviews_comments_private and not self.action.comment),
+            is_pre_moderation=self.reviewable.provider.reviews_workflow == workflow.Workflows.PRE_MODERATION.value
         )
 
     def get_context(self):
