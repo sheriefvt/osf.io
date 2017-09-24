@@ -2,7 +2,6 @@
 from __future__ import unicode_literals
 
 from include import IncludeQuerySet
-from blinker import signal
 from transitions import Machine
 
 from django.db import models
@@ -22,8 +21,7 @@ from osf.models import OSFUser
 from website import mails
 from website.notifications.emails import get_user_subscriptions, get_node_lineage
 from website.notifications import utils
-
-reviews_email = signal('reviews_email')
+from website.reviews import signals as reviews
 
 
 class ReviewProviderMixin(models.Model):
@@ -195,75 +193,82 @@ class ReviewsMachine(Machine):
         return self.reviewable.provider.reviews_workflow == workflow.Workflows.PRE_MODERATION.value
 
     def notify_submit(self, ev):
+        info = self.get_info()
         context = self.get_context()
         context['referrer'] = ev.kwargs.get('user')
         context['template'] = 'reviews_submission_confirmation'
-        context['is_pre_moderation'] = self.get_info().get('is_pre_moderation')
-        reviews_email.send(context=context)
+        context['is_pre_moderation'] = info.get('is_pre_moderation')
+        reviews.reviews_email.send(context=context, caller='notify_submit')
 
     def notify_accept(self, ev):
-        context = self.get_context()
-        context['template'] = 'reviews_submission_status',
-        context['is_pre_moderation'] = self.get_info().get('is_pre_moderation')
-        context['notify_comment'] = self.get_info().get('notify_comment')
-        context['is_rejected'] = self.get_info().get('is_rejected')
-        reviews_email.send(context=context)
+        self.get_accept_reject_notification()
 
     def notify_reject(self, ev):
-        context = self.get_context()
-        context['template'] = 'reviews_submission_status',
-        context['is_pre_moderation'] = self.get_info().get('is_pre_moderation')
-        context['notify_comment'] = self.get_info().get('notify_comment')
-        context['is_rejected'] = self.get_info().get('is_rejected')
-        reviews_email.send(context=context)
+        self.get_accept_reject_notification()
 
     def notify_edit_comment(self, ev):
         context = self.get_context()
+        info = self.get_info()
         context['template'] = 'reviews_update_comment'
-        reviews_email.send(context=context)
+        if info.get('notify_comment'):
+            reviews.reviews_email.send(context=context, caller='notify_edit_comment')
 
     def get_info(self):
-        return dict(
-            is_rejected=self.action.to_state == workflow.States.REJECTED.value,
-            notify_comment=not (self.reviewable.provider.reviews_comments_private and not self.action.comment),
-            is_pre_moderation=self.reviewable.provider.reviews_workflow == workflow.Workflows.PRE_MODERATION.value
-        )
+        return {
+            'is_rejected': self.action.to_state == workflow.States.REJECTED.value,
+            'notify_comment': not self.reviewable.provider.reviews_comments_private and self.action.comment,
+            'is_pre_moderation': self.reviewable.provider.reviews_workflow == workflow.Workflows.PRE_MODERATION.value
+        }
+
+    def get_accept_reject_notification(self):
+        info = self.get_info()
+        context = self.get_context()
+        context['template'] = 'reviews_submission_status',
+        context['is_pre_moderation'] = info.get('is_pre_moderation')
+        context['notify_comment'] = info.get('notify_comment')
+        context['is_rejected'] = info.get('is_rejected')
+        reviews.reviews_email.send(context=context, caller='accept_reject_notification')
 
     def get_context(self):
-        return dict(
-            creator=self.reviewable.node.creator,
-            email_recipients=[contributor._id for contributor in self.reviewable.node.contributors],
-            settings=settings.DOMAIN,
-            node=self.reviewable.node,
-            reviewable_title=self.reviewable.node.title,
-            reviewable_url=self.reviewable.absolute_url,
-            provider=self.reviewable.provider,
-            provider_url=self.reviewable.provider.external_url if self.reviewable.provider.external_url is not None else settings.DOMAIN + '/preprints' + self.reviewable.provider._id
-        )
+        return {
+            'creator': self.reviewable.node.creator,
+            'email_recipients': [contributor._id for contributor in self.reviewable.node.contributors],
+            'settings': settings.DOMAIN,
+            'node': self.reviewable.node,
+            'reviewable_title': self.reviewable.node.title,
+            'reviewable_url': self.reviewable.absolute_url,
+            'provider_comments_private': self.reviewable.provider.reviews_comments_private,
+            'provider': self.reviewable.provider,
+            'provider_url': self.reviewable.provider.external_url if self.reviewable.provider.external_url is not None else settings.DOMAIN + '/preprints' + self.reviewable.provider._id,
+            'provider_contact_email': self.reviewable.provider.email_contact if self.reviewable.provider.email_contact is not None else 'contact@osf.io',
+            'provider_support_email': self.reviewable.provider.email_support if self.reviewable.provider.email_support is not None else 'support@osf.io'
+        }
 
-    @reviews_email.connect
-    def reviews_notification(self, context):
-        timestamp = timezone.now()
-        event_type = utils.find_subscription_type('global_reviews')
-        template = ''.join(context.get('template')) + '.txt.mako'
-        for user_id in context.get('email_recipients'):
-            user = OSFUser.load(user_id)
-            subscriptions = get_user_subscriptions(user, event_type)
-            if user == context.get('creator'):
-                context['is_creator'] = True
-            else:
-                context['is_creator'] = False
-            for notification_type in subscriptions:
-                if (notification_type != 'none' and subscriptions[notification_type] and user_id in subscriptions[notification_type]):
-                    node_lineage_ids = get_node_lineage(context.get('node')) if context.get('node') else []
-                    context['user'] = user
-                    message = mails.render_message(template, **context)
-                    digest = NotificationDigest(
-                        user=user,
-                        timestamp=timestamp,
-                        send_type=notification_type,
-                        event='global_reviews',
-                        message=message,
-                        node_lineage=node_lineage_ids
-                    )
-                    digest.save()
+@reviews.reviews_email.connect
+def reviews_notification(self, context, caller):
+    timestamp = timezone.now()
+    event_type = utils.find_subscription_type('global_reviews')
+    template = ''.join(context.get('template')) + '.txt.mako'
+    for user_id in context.get('email_recipients'):
+        user = OSFUser.load(user_id)
+        subscriptions = get_user_subscriptions(user, event_type)
+        if user == context.get('creator'):
+            context['is_creator'] = True
+        else:
+            context['is_creator'] = False
+        for notification_type in subscriptions:
+            if ((caller == 'notify_submit' or notification_type != 'none') and not (context['provider_comments_private'] and caller == 'notify_edit_comment') and subscriptions[notification_type] and user_id in subscriptions[notification_type]):
+                node_lineage_ids = get_node_lineage(context.get('node')) if context.get('node') else []
+                context['user'] = user
+                context['no_future_emails'] = caller == 'notify_submit' and notification_type == 'none'
+                send_type = notification_type if notification_type != 'none' else 'email_transactional'
+                message = mails.render_message(template, **context)
+                digest = NotificationDigest(
+                    user=user,
+                    timestamp=timestamp,
+                    send_type=send_type,
+                    event='global_reviews',
+                    message=message,
+                    node_lineage=node_lineage_ids
+                )
+                digest.save()

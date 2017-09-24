@@ -12,16 +12,20 @@ Hello  ${user.fullname},
     ${provider.name} has chosen to moderate their submissions using a post-moderation workflow, which means your submission is public and discoverable, while still pending acceptance by a moderator. You will receive a separate notification informing you of any status changes.
 % endif
 
-You will ${'not receive ' if all_global_subscriptions_none else 'be automatically subscribed to '} notification emails for this preprint. Each preprint is associated with a project on the Open Science Framework for managing the preprint.  To change your email notification preferences, visit your project user settings: ${settings + "settings/notifications/"}
-
+You will ${'not receive ' if no_future_emails else 'be automatically subscribed to '} future notification emails for this preprint. Each preprint is associated with a project on the Open Science Framework for managing the preprint.  To change your email notification preferences, visit your project user settings: ${settings + "settings/notifications/"}
 
 If you have been  erroneously associated with "${reviewable_title}," then you may visit the project's "Contributors" page and remove yourself as a contributor.
+
+For more information about ${provider.name}, visit ${provider_url} to learn more.  To learn about the Open Science Framework, visit https://osf.io/
+
+For questions regarding submission criteria, please email ${provider_contact_email}
 
 
 Sincerely,
 
 Your ${provider.name} and OSF teams
 
-Want more information? Visit ${provider_url} to learn more about ${provider.name} or https://osf.io/ to learn about the Open Science Framework.
+Center for Open Science
+210 Ridge McIntire Road, Suite 500, Charlottesville, VA 22903-5083
 
-Questions? Email contact@osf.io
+Privacy Policy: https://github.com/CenterForOpenScience/cos.io/blob/master/PRIVACY_POLICY.md
