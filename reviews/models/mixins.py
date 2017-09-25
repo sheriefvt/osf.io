@@ -17,7 +17,6 @@ from website import settings
 from osf.models import NotificationDigest
 from osf.models import OSFUser
 
-
 from website import mails
 from website.notifications.emails import get_user_subscriptions, get_node_lineage
 from website.notifications import utils
