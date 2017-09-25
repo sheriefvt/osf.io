@@ -23,6 +23,8 @@ from osf_tests import factories
 from tests.base import capture_signals
 from tests.base import OsfTestCase, NotificationTestCase
 
+from reviews.models import mixins
+
 
 class TestNotificationsModels(OsfTestCase):
 
@@ -1799,3 +1801,50 @@ class TestSendDigest(OsfTestCase):
         remove_notifications(email_notification_ids=[digest_id])
         with assert_raises(NotificationDigest.DoesNotExist):
             NotificationDigest.objects.get(_id=digest_id)
+
+@mock.patch('website.mails.render_message')
+class TestNotificationsReviews(OsfTestCase):
+    def test_reviews_notification(self, mock_render):
+        provider = factories.PreprintProviderFactory(_id = 'engrxiv')
+        preprint = factories.PreprintFactory(provider = provider)
+        user = factories.UserFactory()
+        context =  {
+            'creator': user,
+            'email_recipients': [user._id],
+            'template': 'test',
+            'settings': 'osf.io',
+            'referrer': user,
+            'node': preprint.node,
+            'is_pre_moderation': True,
+            'reviewable_title': 'test_preprint',
+            'reviewable_url': 'http://engrxiv.com/test',
+            'provider_comments_private': False,
+            'provider': provider,
+            'provider_url': 'http://engrxiv.com',
+            'provider_contact_email': 'contact@osf.io',
+            'provider_support_email': 'support@osf.io'
+        }
+        factories.NotificationSubscriptionFactory(
+            _id=user._id + '_' + 'global_comments',
+            user=user,
+            event_name='global_comments'
+        ).add_user_to_subscription(user, 'email_transactional')
+
+        factories.NotificationSubscriptionFactory(
+            _id=user._id + '_' + 'global_file_updated',
+            user=user,
+            event_name='global_file_updated'
+        ).add_user_to_subscription(user, 'email_transactional')
+
+        factories.NotificationSubscriptionFactory(
+            _id=user._id + '_' + 'global_reviews',
+            user=user,
+            event_name='global_reviews'
+        ).add_user_to_subscription(user, 'email_transactional')
+        mixins.reviews_notification(self, context=context, caller='notify_submit')
+        assert_true(mock_render.called)
+        template = ''.join(context.get('template')) + '.txt.mako'
+        mock_render.assert_called_with(template, **context)
+        contributor_subscriptions = list(utils.get_all_user_subscriptions(user))
+        event_types = [sub.event_name for sub in contributor_subscriptions]
+        assert_in('global_reviews', event_types)
