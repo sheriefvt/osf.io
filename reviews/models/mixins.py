@@ -186,7 +186,7 @@ class ReviewsMachine(Machine):
             self.reviewable.node._has_abandoned_preprint = False
             self.reviewable.is_published = True
             user = ev.kwargs.get('user')
-            auth=Auth(user)
+            auth = Auth(user)
             self.reviewable.node.add_log(
                 action=NodeLog.PREPRINT_INITIATED,
                 params={
