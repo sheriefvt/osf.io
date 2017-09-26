@@ -240,7 +240,8 @@ class ReviewsMachine(Machine):
             'provider': self.reviewable.provider,
             'provider_url': self.reviewable.provider.external_url if self.reviewable.provider.external_url is not None else settings.DOMAIN + '/preprints' + self.reviewable.provider._id,
             'provider_contact_email': self.reviewable.provider.email_contact if self.reviewable.provider.email_contact is not None else 'contact@osf.io',
-            'provider_support_email': self.reviewable.provider.email_support if self.reviewable.provider.email_support is not None else 'support@osf.io'
+            'provider_support_email': self.reviewable.provider.email_support if self.reviewable.provider.email_support is not None else 'support@osf.io',
+            'provider_preprint_word': self.reviewable.provider.preprint_word
         }
 
 @reviews.reviews_email.connect
