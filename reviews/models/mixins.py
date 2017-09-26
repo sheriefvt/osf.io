@@ -3,14 +3,18 @@ from __future__ import unicode_literals
 
 from include import IncludeQuerySet
 from transitions import Machine
+from framework.auth import Auth
+from framework.postcommit_tasks.handlers import enqueue_postcommit_task
 
 from django.db import models
 from django.db import transaction
 from django.utils import timezone
 
 from osf.models.action import Action
+from osf.models import NodeLog
 from reviews import workflow
 from reviews.exceptions import InvalidTriggerError
+from website.preprints.tasks import get_and_set_preprint_identifiers
 
 
 class ReviewProviderMixin(models.Model):
@@ -170,10 +174,35 @@ class ReviewsMachine(Machine):
     def save_changes(self, ev):
         now = self.action.date_created if self.action is not None else timezone.now()
         should_publish = self.reviewable.in_public_reviews_state
-        if should_publish and not self.reviewable.is_published:
-            self.reviewable.is_published = True
+        to_state = ev.state.name
+        if should_publish and not self.reviewable.is_published and to_state == workflow.States.ACCEPTED.value:
+            if not (self.reviewable.node.preprint_file and self.reviewable.node.preprint_file.node == self.reviewable.node):
+                raise ValueError('Preprint node is not a valid preprint; cannot publish.')
+            if not self.reviewable.provider:
+                raise ValueError('Preprint provider not specified; cannot publish.')
+            if not self.reviewable.subjects.exists():
+                raise ValueError('Preprint must have at least one subject to be published.')
             self.reviewable.date_published = now
-            # TODO EZID (MOD-70)
+            self.reviewable.node._has_abandoned_preprint = False
+            self.reviewable.is_published = True
+            user = ev.kwargs.get('user')
+            auth=Auth(user)
+            self.reviewable.node.add_log(
+                action=NodeLog.PREPRINT_INITIATED,
+                params={
+                    'preprint': self.reviewable._id
+                },
+                auth=auth,
+                save=False,
+            )
+            if not self.reviewable.node.is_public:
+                self.node.set_privacy(
+                    self.node.PUBLIC,
+                    auth=None,
+                    log=True
+                )
+            enqueue_postcommit_task(get_and_set_preprint_identifiers, (), {'preprint': self.reviewable}, celery=True)
+
         elif not should_publish and self.reviewable.is_published:
             self.reviewable.is_published = False
         self.reviewable.save()
