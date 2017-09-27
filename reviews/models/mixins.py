@@ -174,8 +174,7 @@ class ReviewsMachine(Machine):
     def save_changes(self, ev):
         now = self.action.date_created if self.action is not None else timezone.now()
         should_publish = self.reviewable.in_public_reviews_state
-        to_state = ev.state.name
-        if should_publish and not self.reviewable.is_published and to_state == workflow.States.ACCEPTED.value:
+        if should_publish and not self.reviewable.is_published:
             if not (self.reviewable.node.preprint_file and self.reviewable.node.preprint_file.node == self.reviewable.node):
                 raise ValueError('Preprint node is not a valid preprint; cannot publish.')
             if not self.reviewable.provider:
