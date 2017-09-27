@@ -20,7 +20,7 @@ from osf.models import OSFUser
 from website import mails
 from website.notifications.emails import get_user_subscriptions, get_node_lineage
 from website.notifications import utils
-from website.reviews import signals as reviews
+from website.reviews import signals as reviews_signals
 
 
 class ReviewProviderMixin(models.Model):
@@ -192,59 +192,39 @@ class ReviewsMachine(Machine):
         return self.reviewable.provider.reviews_workflow == workflow.Workflows.PRE_MODERATION.value
 
     def notify_submit(self, ev):
-        info = self.get_info()
         context = self.get_context()
         context['referrer'] = ev.kwargs.get('user')
         context['template'] = 'reviews_submission_confirmation'
-        context['is_pre_moderation'] = info.get('is_pre_moderation')
-        reviews.reviews_email.send(context=context, caller='notify_submit')
+        reviews_signals.reviews_email.send(context=context, caller='notify_submit')
 
-    def notify_accept(self, ev):
-        self.get_accept_reject_notification()
-
-    def notify_reject(self, ev):
+    def notify_accept_reject(self, ev):
         self.get_accept_reject_notification()
 
     def notify_edit_comment(self, ev):
         context = self.get_context()
-        info = self.get_info()
         context['template'] = 'reviews_update_comment'
-        if info.get('notify_comment'):
-            reviews.reviews_email.send(context=context, caller='notify_edit_comment')
-
-    def get_info(self):
-        return {
-            'is_rejected': self.action.to_state == workflow.States.REJECTED.value,
-            'notify_comment': not self.reviewable.provider.reviews_comments_private and self.action.comment,
-            'is_pre_moderation': self.reviewable.provider.reviews_workflow == workflow.Workflows.PRE_MODERATION.value
-        }
+        if not self.reviewable.provider.reviews_comments_private and self.action.comment:
+            reviews_signals.reviews_email.send(context=context, caller='notify_edit_comment')
 
     def get_accept_reject_notification(self):
-        info = self.get_info()
         context = self.get_context()
         context['template'] = 'reviews_submission_status',
-        context['is_pre_moderation'] = info.get('is_pre_moderation')
-        context['notify_comment'] = info.get('notify_comment')
-        context['is_rejected'] = info.get('is_rejected')
-        reviews.reviews_email.send(context=context, caller='accept_reject_notification')
+        context['notify_comment'] = not self.reviewable.provider.reviews_comments_private and self.action.comment,
+        context['is_rejected'] = self.action.to_state == workflow.States.REJECTED.value,
+        reviews_signals.reviews_email.send(context=context, caller='accept_reject_notification')
 
     def get_context(self):
         return {
-            'creator': self.reviewable.node.creator,
-            'email_recipients': [contributor._id for contributor in self.reviewable.node.contributors],
             'settings': settings.DOMAIN,
-            'node': self.reviewable.node,
-            'reviewable_title': self.reviewable.node.title,
-            'reviewable_url': self.reviewable.absolute_url,
-            'provider_comments_private': self.reviewable.provider.reviews_comments_private,
-            'provider': self.reviewable.provider,
+            'email_recipients': [contributor._id for contributor in self.reviewable.node.contributors],
+            'reviewable': self.reviewable,
+            'workflow': self.reviewable.provider.reviews_workflow,
             'provider_url': self.reviewable.provider.external_url if self.reviewable.provider.external_url is not None else settings.DOMAIN + '/preprints' + self.reviewable.provider._id,
             'provider_contact_email': self.reviewable.provider.email_contact if self.reviewable.provider.email_contact is not None else 'contact@osf.io',
             'provider_support_email': self.reviewable.provider.email_support if self.reviewable.provider.email_support is not None else 'support@osf.io',
-            'provider_preprint_word': self.reviewable.provider.preprint_word
         }
 
-@reviews.reviews_email.connect
+@reviews_signals.reviews_email.connect
 def reviews_notification(self, context, caller):
     timestamp = timezone.now()
     event_type = utils.find_subscription_type('global_reviews')
@@ -252,13 +232,17 @@ def reviews_notification(self, context, caller):
     for user_id in context.get('email_recipients'):
         user = OSFUser.load(user_id)
         subscriptions = get_user_subscriptions(user, event_type)
-        if user == context.get('creator'):
+        if user == context.get('reviewable').node.creator:
             context['is_creator'] = True
         else:
             context['is_creator'] = False
+        print(context['workflow'])
         for notification_type in subscriptions:
-            if ((caller == 'notify_submit' or notification_type != 'none') and not (context['provider_comments_private'] and caller == 'notify_edit_comment') and subscriptions[notification_type] and user_id in subscriptions[notification_type]):
-                node_lineage_ids = get_node_lineage(context.get('node')) if context.get('node') else []
+            check_notify_comments = not (context['reviewable'].provider.reviews_comments_private and caller == 'notify_edit_comment') # check if provider settings for comment notification
+            check_user_subscribe = subscriptions[notification_type] and user_id in subscriptions[notification_type] # check if user is subscribed to this type of notifications
+            check_submission = caller == 'notify_submit' or notification_type != 'none' # check if submission and bypass user subscription if none. Users will receive email for submission only with no more notifications in future.
+            if (check_submission and check_notify_comments and check_user_subscribe):
+                node_lineage_ids = get_node_lineage(context.get('reviewable').node) if context.get('reviewable').node else []
                 context['user'] = user
                 context['no_future_emails'] = caller == 'notify_submit' and notification_type == 'none'
                 send_type = notification_type if notification_type != 'none' else 'email_transactional'
