@@ -236,11 +236,10 @@ def reviews_notification(self, context, caller):
             context['is_creator'] = True
         else:
             context['is_creator'] = False
-        print(context['workflow'])
         for notification_type in subscriptions:
-            check_notify_comments = not (context['reviewable'].provider.reviews_comments_private and caller == 'notify_edit_comment') # check if provider settings for comment notification
-            check_user_subscribe = subscriptions[notification_type] and user_id in subscriptions[notification_type] # check if user is subscribed to this type of notifications
-            check_submission = caller == 'notify_submit' or notification_type != 'none' # check if submission and bypass user subscription if none. Users will receive email for submission only with no more notifications in future.
+            check_notify_comments = not (context['reviewable'].provider.reviews_comments_private and caller == 'notify_edit_comment')  # check if provider settings for comment notification
+            check_user_subscribe = subscriptions[notification_type] and user_id in subscriptions[notification_type]  # check if user is subscribed to this type of notifications
+            check_submission = caller == 'notify_submit' or notification_type != 'none'  # check if submission and bypass user subscription if none. Users will receive email for submission only with no more notifications in future.
             if (check_submission and check_notify_comments and check_user_subscribe):
                 node_lineage_ids = get_node_lineage(context.get('reviewable').node) if context.get('reviewable').node else []
                 context['user'] = user
