@@ -174,6 +174,8 @@ class ReviewsMachine(Machine):
     def save_changes(self, ev):
         now = self.action.date_created if self.action is not None else timezone.now()
         should_publish = self.reviewable.in_public_reviews_state
+        user = ev.kwargs.get('user')
+        auth = Auth(user)
         if should_publish and not self.reviewable.is_published:
             if not (self.reviewable.node.preprint_file and self.reviewable.node.preprint_file.node == self.reviewable.node):
                 raise ValueError('Preprint node is not a valid preprint; cannot publish.')
@@ -184,25 +186,25 @@ class ReviewsMachine(Machine):
             self.reviewable.date_published = now
             self.reviewable.node._has_abandoned_preprint = False
             self.reviewable.is_published = True
-            user = ev.kwargs.get('user')
-            auth = Auth(user)
+
             self.reviewable.node.add_log(
-                action=NodeLog.PREPRINT_INITIATED,
+                action=NodeLog.PREPRINT_PUBLISHED + '_' + self.reviewable.provider.reviews_workflow,
                 params={
                     'preprint': self.reviewable._id
                 },
                 auth=auth,
                 save=False,
             )
-            if not self.reviewable.node.is_public:
-                self.node.set_privacy(
-                    self.node.PUBLIC,
-                    auth=None,
-                    log=True
-                )
             enqueue_postcommit_task(get_and_set_preprint_identifiers, (), {'preprint': self.reviewable}, celery=True)
-
         elif not should_publish and self.reviewable.is_published:
+            self.reviewable.node.add_log(
+                action=NodeLog.PREPRINT_UNPUBLISHED + '_' + self.reviewable.provider.reviews_workflow,
+                params={
+                    'preprint': self.reviewable._id
+                },
+                auth=auth,
+                save=False,
+            )
             self.reviewable.is_published = False
         self.reviewable.save()
 
