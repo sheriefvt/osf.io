@@ -12,7 +12,7 @@ ${reviewable.provider.name} has chosen to moderate their submissions using a pre
 ${reviewable.provider.name} has chosen to moderate their submissions using a post-moderation workflow, which means your submission is public and discoverable, while still pending acceptance by a moderator. You will receive a separate notification informing you of any status changes.
 % endif
 
-You will ${'not receive ' if no_future_emails else 'be automatically subscribed to '} future notification emails for this ${reviewable.provider.preprint_word}. Each ${reviewable.provider.preprint_word} is associated with a project on the Open Science Framework for managing the ${reviewable.provider.preprint_word}. To change your email notification preferences, visit your project user settings: ${settings + "settings/notifications/"}
+You will ${'not receive ' if no_future_emails else 'be automatically subscribed to '}future notification emails for this ${reviewable.provider.preprint_word}. Each ${reviewable.provider.preprint_word} is associated with a project on the Open Science Framework for managing the ${reviewable.provider.preprint_word}. To change your email notification preferences, visit your project user settings: ${domain + "settings/notifications/"}
 
 If you have been erroneously associated with "${reviewable.node.title}," then you may visit the project's "Contributors" page and remove yourself as a contributor.
 

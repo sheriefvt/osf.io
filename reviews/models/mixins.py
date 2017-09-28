@@ -198,7 +198,11 @@ class ReviewsMachine(Machine):
         reviews_signals.reviews_email.send(context=context, caller='notify_submit')
 
     def notify_accept_reject(self, ev):
-        self.get_accept_reject_notification()
+        context = self.get_context()
+        context['template'] = 'reviews_submission_status',
+        context['notify_comment'] = not self.reviewable.provider.reviews_comments_private and self.action.comment,
+        context['is_rejected'] = self.action.to_state == workflow.States.REJECTED.value,
+        reviews_signals.reviews_email.send(context=context, caller='accept_reject_notification')
 
     def notify_edit_comment(self, ev):
         context = self.get_context()
@@ -206,16 +210,9 @@ class ReviewsMachine(Machine):
         if not self.reviewable.provider.reviews_comments_private and self.action.comment:
             reviews_signals.reviews_email.send(context=context, caller='notify_edit_comment')
 
-    def get_accept_reject_notification(self):
-        context = self.get_context()
-        context['template'] = 'reviews_submission_status',
-        context['notify_comment'] = not self.reviewable.provider.reviews_comments_private and self.action.comment,
-        context['is_rejected'] = self.action.to_state == workflow.States.REJECTED.value,
-        reviews_signals.reviews_email.send(context=context, caller='accept_reject_notification')
-
     def get_context(self):
         return {
-            'settings': settings.DOMAIN,
+            'domain': settings.DOMAIN,
             'email_recipients': [contributor._id for contributor in self.reviewable.node.contributors],
             'reviewable': self.reviewable,
             'workflow': self.reviewable.provider.reviews_workflow,
@@ -225,7 +222,7 @@ class ReviewsMachine(Machine):
         }
 
 @reviews_signals.reviews_email.connect
-def reviews_notification(self, context, caller):
+def reviews_notification(self, context, caller, no_future_emails=False):
     timestamp = timezone.now()
     event_type = utils.find_subscription_type('global_reviews')
     template = ''.join(context.get('template')) + '.txt.mako'
@@ -237,13 +234,12 @@ def reviews_notification(self, context, caller):
         else:
             context['is_creator'] = False
         for notification_type in subscriptions:
-            check_notify_comments = not (context['reviewable'].provider.reviews_comments_private and caller == 'notify_edit_comment')  # check if provider settings for comment notification
             check_user_subscribe = subscriptions[notification_type] and user_id in subscriptions[notification_type]  # check if user is subscribed to this type of notifications
             check_submission = caller == 'notify_submit' or notification_type != 'none'  # check if submission and bypass user subscription if none. Users will receive email for submission only with no more notifications in future.
-            if (check_submission and check_notify_comments and check_user_subscribe):
+            if (check_submission and check_user_subscribe):
                 node_lineage_ids = get_node_lineage(context.get('reviewable').node) if context.get('reviewable').node else []
                 context['user'] = user
-                context['no_future_emails'] = caller == 'notify_submit' and notification_type == 'none'
+                context['no_future_emails'] = notification_type == 'none'
                 send_type = notification_type if notification_type != 'none' else 'email_transactional'
                 message = mails.render_message(template, **context)
                 digest = NotificationDigest(
