@@ -1,4 +1,5 @@
 import pytest
+import mock
 
 from api.base.settings.defaults import API_BASE
 
@@ -72,7 +73,8 @@ class TestActionCreate(object):
         moderator.groups.add(GroupHelper(provider).get_group('moderator'))
         return moderator
 
-    def test_create_permissions(self, app, url, preprint, node_admin, moderator):
+    @mock.patch('website.preprints.tasks.get_and_set_preprint_identifiers.si')
+    def test_create_permissions(self, mock_ezid, app, url, preprint, node_admin, moderator):
         assert preprint.reviews_state == 'initial'
 
         submit_payload = self.create_payload(preprint._id, trigger='submit')
@@ -125,6 +127,9 @@ class TestActionCreate(object):
         assert preprint.reviews_state == 'accepted'
         assert preprint.is_published
 
+        # Check if "get_and_set_preprint_identifiers" is called once.
+        assert mock_ezid.call_count == 1
+
     def test_cannot_create_actions_for_unmoderated_provider(self, app, url, preprint, provider, node_admin):
         provider.reviews_workflow = None
         provider.save()
@@ -173,7 +178,8 @@ class TestActionCreate(object):
         res = app.post_json_api(url, bad_payload, auth=moderator.auth, expect_errors=True)
         assert res.status_code == 400
 
-    def test_valid_transitions(self, app, url, preprint, provider, moderator):
+    @mock.patch('website.preprints.tasks.get_and_set_preprint_identifiers.si')
+    def test_valid_transitions(self, mock_ezid, app, url, preprint, provider, moderator):
         valid_transitions = {
             'post-moderation': [
                 ('accepted', 'edit_comment', 'accepted'),
@@ -227,3 +233,7 @@ class TestActionCreate(object):
                     assert preprint.date_last_transitioned is None
                 else:
                     assert preprint.date_last_transitioned == action.date_created
+
+        # Check if total 8 calls to "get_and_set_preprint_identifiers". The preprint went through total 5 post_moderation in_public_reviews_state
+        # (3 accepted and 2 pending states) and 3 pre_moderation in_public_reviews_state (accepted states).
+        assert mock_ezid.call_count == 8
