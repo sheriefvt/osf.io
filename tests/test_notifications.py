@@ -1809,18 +1809,12 @@ class TestNotificationsReviews(OsfTestCase):
         preprint = factories.PreprintFactory(provider = provider)
         user = factories.UserFactory()
         context =  {
-            'creator': user,
             'email_recipients': [user._id],
             'template': 'test',
-            'settings': 'osf.io',
+            'domain': 'osf.io',
             'referrer': user,
-            'node': preprint.node,
-            'is_pre_moderation': True,
-            'reviewable_title': 'test_preprint',
-            'reviewable_url': 'http://engrxiv.com/test',
-            'provider_comments_private': False,
-            'provider': provider,
-            'provider_url': 'http://engrxiv.com',
+            'reviewable': preprint,
+            'workflow': 'pre-moderation',
             'provider_contact_email': 'contact@osf.io',
             'provider_support_email': 'support@osf.io'
         }
