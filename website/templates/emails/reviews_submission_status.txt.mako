@@ -8,7 +8,7 @@ Your submission "${reviewable.node.title}", submitted to ${reviewable.provider.n
 
 You will ${'not receive ' if no_future_emails else 'be automatically subscribed to '}future notification emails for this ${reviewable.provider.preprint_word}. Each ${reviewable.provider.preprint_word} is associated with a project on the Open Science Framework for managing the ${reviewable.provider.preprint_word}. To change your email notification preferences, visit your project user settings: ${domain + "settings/notifications/"}
 
-If you have been erroneously associated with "${reviewable.node.title}," then you may visit the project's "Contributors" page and remove yourself as a contributor.
+If you have been erroneously associated with "${reviewable.node.title}", then you may visit the project's "Contributors" page and remove yourself as a contributor.
 
 For more information about ${reviewable.provider.name}, visit ${provider_url} to learn more. To learn about the Open Science Framework, visit https://osf.io/
 

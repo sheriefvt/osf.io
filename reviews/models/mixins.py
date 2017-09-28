@@ -195,20 +195,20 @@ class ReviewsMachine(Machine):
         context = self.get_context()
         context['referrer'] = ev.kwargs.get('user')
         context['template'] = 'reviews_submission_confirmation'
-        reviews_signals.reviews_email.send(context=context, caller='notify_submit')
+        reviews_signals.reviews_email.send(context=context, notify_submit=True)
 
     def notify_accept_reject(self, ev):
         context = self.get_context()
         context['template'] = 'reviews_submission_status',
         context['notify_comment'] = not self.reviewable.provider.reviews_comments_private and self.action.comment,
         context['is_rejected'] = self.action.to_state == workflow.States.REJECTED.value,
-        reviews_signals.reviews_email.send(context=context, caller='accept_reject_notification')
+        reviews_signals.reviews_email.send(context=context)
 
     def notify_edit_comment(self, ev):
         context = self.get_context()
         context['template'] = 'reviews_update_comment'
         if not self.reviewable.provider.reviews_comments_private and self.action.comment:
-            reviews_signals.reviews_email.send(context=context, caller='notify_edit_comment')
+            reviews_signals.reviews_email.send(context=context)
 
     def get_context(self):
         return {
@@ -222,7 +222,7 @@ class ReviewsMachine(Machine):
         }
 
 @reviews_signals.reviews_email.connect
-def reviews_notification(self, context, caller, no_future_emails=False):
+def reviews_notification(self, context, notify_submit=False):
     timestamp = timezone.now()
     event_type = utils.find_subscription_type('global_reviews')
     template = ''.join(context.get('template')) + '.txt.mako'
@@ -235,7 +235,7 @@ def reviews_notification(self, context, caller, no_future_emails=False):
             context['is_creator'] = False
         for notification_type in subscriptions:
             check_user_subscribe = subscriptions[notification_type] and user_id in subscriptions[notification_type]  # check if user is subscribed to this type of notifications
-            check_submission = caller == 'notify_submit' or notification_type != 'none'  # check if submission and bypass user subscription if none. Users will receive email for submission only with no more notifications in future.
+            check_submission = notify_submit or notification_type != 'none'  # check if submission and bypass user subscription if none. Users will receive email for submission only with no more notifications in future.
             if (check_submission and check_user_subscribe):
                 node_lineage_ids = get_node_lineage(context.get('reviewable').node) if context.get('reviewable').node else []
                 context['user'] = user
