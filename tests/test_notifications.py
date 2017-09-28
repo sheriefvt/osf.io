@@ -1835,7 +1835,7 @@ class TestNotificationsReviews(OsfTestCase):
             user=user,
             event_name='global_reviews'
         ).add_user_to_subscription(user, 'email_transactional')
-        mixins.reviews_notification(self, context=context, caller='notify_submit')
+        mixins.reviews_notification(self, context=context, notify_submit=True)
         assert_true(mock_render.called)
         template = ''.join(context.get('template')) + '.txt.mako'
         mock_render.assert_called_with(template, **context)
