@@ -188,7 +188,7 @@ class ReviewsMachine(Machine):
             self.reviewable.is_published = True
 
             self.reviewable.node.add_log(
-                action=NodeLog.PREPRINT_PUBLISHED + '_' + self.reviewable.provider.reviews_workflow,
+                action=NodeLog.PREPRINT_INITIATED,
                 params={
                     'preprint': self.reviewable._id
                 },
@@ -197,14 +197,6 @@ class ReviewsMachine(Machine):
             )
             enqueue_postcommit_task(get_and_set_preprint_identifiers, (), {'preprint': self.reviewable}, celery=True)
         elif not should_publish and self.reviewable.is_published:
-            self.reviewable.node.add_log(
-                action=NodeLog.PREPRINT_UNPUBLISHED + '_' + self.reviewable.provider.reviews_workflow,
-                params={
-                    'preprint': self.reviewable._id
-                },
-                auth=auth,
-                save=False,
-            )
             self.reviewable.is_published = False
         self.reviewable.save()
 

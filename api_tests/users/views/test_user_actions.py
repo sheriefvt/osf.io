@@ -1,5 +1,6 @@
 import pytest
 import mock
+from nose.tools import assert_false, assert_true
 
 from api.base.settings.defaults import API_BASE
 
@@ -225,15 +226,14 @@ class TestActionCreate(object):
                 if preprint.in_public_reviews_state:
                     assert preprint.is_published
                     assert preprint.date_published == action.date_created
+                    assert_true(mock_ezid.called)
+                    mock_ezid.reset_mock()
                 else:
                     assert not preprint.is_published
                     assert preprint.date_published is None
+                    assert_false(mock_ezid.called)
 
                 if trigger == 'edit_comment':
                     assert preprint.date_last_transitioned is None
                 else:
                     assert preprint.date_last_transitioned == action.date_created
-
-        # Check if total 8 calls to "get_and_set_preprint_identifiers". The preprint went through total 5 post_moderation in_public_reviews_state
-        # (3 accepted and 2 pending states) and 3 pre_moderation in_public_reviews_state (accepted states).
-        assert mock_ezid.call_count == 8

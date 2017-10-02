@@ -115,8 +115,6 @@ class NodeLog(ObjectIDMixin, BaseModel):
     PREPRINT_INITIATED = 'preprint_initiated'
     PREPRINT_FILE_UPDATED = 'preprint_file_updated'
     PREPRINT_LICENSE_UPDATED = 'preprint_license_updated'
-    PREPRINT_PUBLISHED = 'preprint_published'
-    PREPRINT_UNPUBLISHED = 'preprint_unpublished'
 
     VIEW_ONLY_LINK_ADDED = 'view_only_link_added'
     VIEW_ONLY_LINK_REMOVED = 'view_only_link_removed'
